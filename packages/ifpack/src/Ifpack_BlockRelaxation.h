@@ -861,10 +861,9 @@ DoGaussSeidel(Epetra_MultiVector& X, Epetra_MultiVector& Y) const
       IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length,NumEntries,
                                                &Values[0], &Indices[0]));
 
-      for (int k = 0 ; k < NumEntries ; ++k) {
-        int col = Indices[k];
-
-        for (int kk = 0 ; kk < NumVectors ; ++kk) {
+      for (int kk = 0 ; kk < NumVectors ; ++kk) {
+        for (int k = 0 ; k < NumEntries ; ++k) {
+          int col = Indices[k];
           X[kk][LID] -= Values[k] * y2_ptr[kk][col];
         }
       }
@@ -986,10 +985,9 @@ DoSGS(const Epetra_MultiVector& X, Epetra_MultiVector& Xcopy,
       IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length,NumEntries,
                                                &Values[0], &Indices[0]));
 
-      for (int k = 0 ; k < NumEntries ; ++k) {
-        int col = Indices[k];
-
-        for (int kk = 0 ; kk < NumVectors ; ++kk) {
+      for (int kk = 0 ; kk < NumVectors ; ++kk) {
+        for (int k = 0 ; k < NumEntries ; ++k) {
+          int col = Indices[k];
           Xcopy[kk][LID] -= Values[k] * y2_ptr[kk][col];
         }
       }
@@ -1049,12 +1047,11 @@ DoSGS(const Epetra_MultiVector& X, Epetra_MultiVector& Xcopy,
       IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length,NumEntries,
                                                &Values[0], &Indices[0]));
 
-      for (int k = 0 ; k < NumEntries ; ++k) {
-        int col = Indices[k];
-
-          for (int kk = 0 ; kk < NumVectors ; ++kk) {
-            Xcopy[kk][LID] -= Values[k] * y2_ptr[kk][col];
-          }
+      for (int kk = 0 ; kk < NumVectors ; ++kk) {
+        for (int k = 0 ; k < NumEntries ; ++k) {
+          int col = Indices[k];
+          Xcopy[kk][LID] -= Values[k] * y2_ptr[kk][col];
+        }
       }
     }
 
