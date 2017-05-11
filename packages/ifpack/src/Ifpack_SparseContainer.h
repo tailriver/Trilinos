@@ -550,7 +550,6 @@ SetParameters(Teuchos::ParameterList& List)
 }
 
 //==============================================================================
-// FIXME: optimize performances of this guy...
 template<typename T>
 int Ifpack_SparseContainer<T>::Extract(const Epetra_RowMatrix& Matrix_in)
 {
@@ -564,6 +563,40 @@ int Ifpack_SparseContainer<T>::Extract(const Epetra_RowMatrix& Matrix_in)
       IFPACK_CHK_ERR(-1);
   }
 
+  // Optimized for Epetra_CrsMatrix if available
+  const Epetra_CrsMatrix* CrsMatrix = dynamic_cast<const Epetra_CrsMatrix*>(&Matrix_in);
+  if (CrsMatrix) {
+
+    std::map<int, int> LID_to_CID; // local id to container id
+    for (int CID = 0 ; CID < NumRows_ ; ++CID) {
+      int LID = ID(CID);
+      LID_to_CID.insert(std::make_pair(LID, CID));
+    }
+
+    for (std::map<int, int>::iterator it1 = LID_to_CID.begin(); it1 != LID_to_CID.end(); ++it1) {
+      int LRID = it1->first; // local row id
+      int CRID = it1->second; // container row id
+
+      int NumEntries;
+      double* Values;
+      int* Indices;
+      IFPACK_CHK_ERR(CrsMatrix->ExtractMyRowView(LRID, NumEntries, Values, Indices));
+
+      for (int k = 0 ; k < NumEntries ; ++k) {
+        int LCID = Indices[k]; // local column id
+        std::map<int, int>::iterator it2 = LID_to_CID.find(LCID);
+        if (it2 != LID_to_CID.end()) {
+          int CCID = it2->second; // container column id
+          SetMatrixElement(CRID, CCID, Values[k]);
+        }
+      }
+    }
+
+    IFPACK_CHK_ERR(Matrix_->FillComplete());
+    return 0;
+  }
+
+  // Epetra_RowMatrix (last resort)
   int Length = Matrix_in.MaxNumEntries();
   std::vector<double> Values;
   Values.resize(Length);
