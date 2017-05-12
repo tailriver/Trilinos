@@ -177,11 +177,11 @@ int Amesos_Mumps::ConvertToTriplet(const bool OnlyValues)
   else {
     ptr = &RedistrMatrix(true);
   }
+  Epetra_CrsMatrix* Eptr = dynamic_cast<Epetra_CrsMatrix*>( ptr );
 
   ResetTimer();
   
 #ifdef EXTRA_DEBUG_INFO
-  Epetra_CrsMatrix* Eptr = dynamic_cast<Epetra_CrsMatrix*>( ptr );
   if ( ptr->NumGlobalNonzeros() < 300 ) SetICNTL(4,3 );  // Enable more debug info for small matrices
   if ( ptr->NumGlobalNonzeros() < 42 && Eptr ) { 
       std::cout << " Matrix = " << std::endl ; 
@@ -191,47 +191,59 @@ int Amesos_Mumps::ConvertToTriplet(const bool OnlyValues)
   }
 #endif
 
-  Row.resize(ptr->NumMyNonzeros());
-  Col.resize(ptr->NumMyNonzeros());
-  Val.resize(ptr->NumMyNonzeros());
+  bool is_symmetric = MatrixProperty_ != 0;
+  int maximum_size = is_symmetric ? ptr->NumMyNonzeros() / 2 + ptr->NumMyRows() : ptr->NumMyNonzeros();
+  Row.reserve(maximum_size);
+  Col.reserve(maximum_size);
+  Val.reserve(maximum_size);
 
   int MaxNumEntries = ptr->MaxNumEntries();
-  std::vector<int> Indices;
-  std::vector<double> Values;
-  Indices.resize(MaxNumEntries);
-  Values.resize(MaxNumEntries);
-
-  int count = 0;
+  int* Indices;
+  double* Values;
+  if (!Eptr) {
+    Indices = new int[MaxNumEntries];
+    Values = new double[MaxNumEntries];
+  }
 
   for (int i = 0; i < ptr->NumMyRows() ; ++i) {
 
     int GlobalRow = ptr->RowMatrixRowMap().GID(i);
 
-    int NumEntries = 0;
-    int ierr;
-    ierr = ptr->ExtractMyRowCopy(i, MaxNumEntries,
-				   NumEntries, &Values[0],
-				   &Indices[0]);
-    AMESOS_CHK_ERR(ierr);
+    int NumEntries;
+    if (Eptr) {
+      AMESOS_CHK_ERR(Eptr->ExtractMyRowView(i, NumEntries, Values, Indices));
+    } else {
+      AMESOS_CHK_ERR(ptr->ExtractMyRowCopy(i, MaxNumEntries, NumEntries, Values, Indices));
+    }
 
     for (int j = 0 ; j < NumEntries ; ++j) {
-      if (OnlyValues == false) {
-	Row[count] = GlobalRow + 1;
-	Col[count] = ptr->RowMatrixColMap().GID(Indices[j]) + 1;
-      }
-      
-      // MS // Added on 15-Mar-05.
-      if (AddToDiag_ && Indices[j] == i)
-        Values[j] += AddToDiag_;
+      if (is_symmetric || !OnlyValues) {
+        int row = GlobalRow + 1;
+        int col = ptr->RowMatrixColMap().GID(Indices[j]) + 1;
 
-      Val[count] = Values[j];
-      count++;
+        if (is_symmetric && row < col) continue;
+
+        if (OnlyValues == false) {
+          Row.push_back(row);
+          Col.push_back(col);
+        }
+      }
+
+      if (AddToDiag_ && Indices[j] == i) {
+        Val.push_back(Values[j] + AddToDiag_);
+      } else {
+        Val.push_back(Values[j]);
+      }
     }
+  }
+  if (!Eptr) {
+    delete[] Indices;
+    delete[] Values;
   }
 
   MtxConvTime_ = AddTime("Total matrix conversion time", MtxConvTime_);
   
-  assert (count <= ptr->NumMyNonzeros());
+  assert (Val.size() <= maximum_size);
 
   return(0);
 }
@@ -486,14 +498,7 @@ int Amesos_Mumps::SymbolicFactorization()
   
   MDS.job = -1  ;     //  Initialization
   MDS.par = 1 ;       //  Host IS involved in computations
-//  MDS.sym = MatrixProperty_;
-  MDS.sym =  0;       //  MatrixProperty_ is unititalized.  Furthermore MUMPS 
-                      //  expects only half of the matrix to be provided for
-                      //  symmetric matrices.  Hence setting MDS.sym to be non-zero
-                      //  indicating that the matrix is symmetric will only work
-                      //  if we change ConvertToTriplet to pass only half of the 
-                      //  matrix.  Bug #2331 and Bug #2332 - low priority
-
+  MDS.sym = MatrixProperty_;
 
   RedistrMatrix(true);
 
@@ -509,7 +514,7 @@ int Amesos_Mumps::SymbolicFactorization()
   // will be entered in PerformNumericalFactorization()
   if (Comm().NumProc() != 1) 
   {
-    MDS.nz_loc = RedistrMatrix().NumMyNonzeros();
+    MDS.nz_loc = Val.size();
 
     if (Comm().MyPID() < MaxProcs_) 
     {
@@ -521,7 +526,7 @@ int Amesos_Mumps::SymbolicFactorization()
   {
     if (Comm().MyPID() == 0) 
     {
-      MDS.nz = Matrix().NumMyNonzeros();
+      MDS.nz = Val.size();
       MDS.irn = &Row[0]; 
       MDS.jcn = &Col[0]; 
     }
@@ -779,7 +784,6 @@ void Amesos_Mumps::PrintStatus() const
   std::cout << "Amesos_Mumps : Percentage of nonzero elements = "
        << 100.0*Matrix().NumGlobalNonzeros()/(pow(Matrix().NumGlobalRows(),2.0)) << std::endl;
   std::cout << "Amesos_Mumps : Use transpose = " << UseTranspose_ << std::endl;
-//  MatrixProperty_ is unused - see bug #2331 and bug #2332 in this file and bugzilla
   if (MatrixProperty_ == 0) std::cout << "Amesos_Mumps : Matrix is general unsymmetric" << std::endl;
   if (MatrixProperty_ == 2) std::cout << "Amesos_Mumps : Matrix is general symmetric" << std::endl;
   if (MatrixProperty_ == 1) std::cout << "Amesos_Mumps : Matrix is SPD" << std::endl;
