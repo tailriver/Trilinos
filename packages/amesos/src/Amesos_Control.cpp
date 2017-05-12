@@ -69,10 +69,10 @@ void Amesos_Control::SetControlParameters( const Teuchos::ParameterList &Paramet
     else if( MatrixProperty == "general" )   
       MatrixProperty_ = 0;
     else {
-      //      AMESOS_CHK_ERR( -1 ) ;
-      //      if ( verbose_ ) std::cerr << "Amesos : ERROR" << std::endl 
-      //	     << "Amesos : MatrixProperty value not recognized ("
-      //	     << MatrixProperty << ")" << std::endl;
+            AMESOS_CHK_ERR( -1 ) ;
+            if ( verbose_ ) std::cerr << "Amesos : ERROR" << std::endl 
+                  << "Amesos : MatrixProperty value not recognized ("
+                  << MatrixProperty << ")" << std::endl;
     }
   }
 
