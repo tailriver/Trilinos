@@ -193,6 +193,9 @@ int Amesos_Mumps::ConvertToTriplet(const bool OnlyValues)
 
   bool is_symmetric = MatrixProperty_ != 0;
   int maximum_size = is_symmetric ? ptr->NumMyNonzeros() / 2 + ptr->NumMyRows() : ptr->NumMyNonzeros();
+  Row.clear();
+  Col.clear();
+  Val.clear();
   Row.reserve(maximum_size);
   Col.reserve(maximum_size);
   Val.reserve(maximum_size);

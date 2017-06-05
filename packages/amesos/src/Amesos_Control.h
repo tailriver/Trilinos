@@ -26,6 +26,7 @@ public:
     MaxProcesses_ = -1;
     ScaleMethod_ = 0;
     Reindex_ = 0;
+    MatrixProperty_ = 0;
   }
 
   //! Default destructor.
