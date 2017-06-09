@@ -818,9 +818,15 @@ DoGaussSeidel(Epetra_MultiVector& X, Epetra_MultiVector& Y) const
 
   // cycle over all local subdomains
 
-  int Length = Matrix().MaxNumEntries();
-  std::vector<int> Indices(Length);
-  std::vector<double> Values(Length);
+  int Length;
+  int* Indices;
+  double* Values;
+  const Epetra_CrsMatrix* CrsMatrix = dynamic_cast<const Epetra_CrsMatrix*>(&Matrix());
+  if (!CrsMatrix) {
+    Length = Matrix().MaxNumEntries();
+    Indices = new int[Length];
+    Values = new double[Length];
+  }
 
   int NumMyRows = Matrix().NumMyRows();
   int NumVectors = X.NumVectors();
@@ -858,8 +864,11 @@ DoGaussSeidel(Epetra_MultiVector& X, Epetra_MultiVector& Y) const
       LID = (*Partitioner_)(i,j);
 
       int NumEntries;
-      IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length,NumEntries,
-                                               &Values[0], &Indices[0]));
+      if (CrsMatrix) {
+        IFPACK_CHK_ERR(CrsMatrix->ExtractMyRowView(LID, NumEntries, Values, Indices));
+      } else {
+        IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length, NumEntries, Values, Indices));
+      }
 
       for (int kk = 0 ; kk < NumVectors ; ++kk) {
         for (int k = 0 ; k < NumEntries ; ++k) {
@@ -914,6 +923,11 @@ DoGaussSeidel(Epetra_MultiVector& X, Epetra_MultiVector& Y) const
         for (int i = 0 ; i < NumMyRows ; ++i)
           y_ptr[m][i] = y2_ptr[m][i];
 
+  if (!CrsMatrix) {
+    delete[] Indices;
+    delete[] Values;
+  }
+
     return(0);
   }
 
@@ -945,11 +959,15 @@ DoSGS(const Epetra_MultiVector& X, Epetra_MultiVector& Xcopy,
   int NumMyRows = Matrix().NumMyRows();
   int NumVectors = X.NumVectors();
 
-  int Length = Matrix().MaxNumEntries();
-  std::vector<int> Indices;
-  std::vector<double> Values;
-  Indices.resize(Length);
-  Values.resize(Length);
+  int Length;
+  int* Indices;
+  double* Values;
+  const Epetra_CrsMatrix* CrsMatrix = dynamic_cast<const Epetra_CrsMatrix*>(&Matrix());
+  if (!CrsMatrix) {
+    Length = Matrix().MaxNumEntries();
+    Indices = new int[Length];
+    Values = new double[Length];
+  }
 
   // an additonal vector is needed by parallel computations
   // (note that applications through Ifpack_AdditiveSchwarz
@@ -982,8 +1000,11 @@ DoSGS(const Epetra_MultiVector& X, Epetra_MultiVector& Xcopy,
     for (int j = 0 ; j < Partitioner_->NumRowsInPart(i) ; ++j) {
       LID = (*Partitioner_)(i,j);
       int NumEntries;
-      IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length,NumEntries,
-                                               &Values[0], &Indices[0]));
+      if (CrsMatrix) {
+        IFPACK_CHK_ERR(CrsMatrix->ExtractMyRowView(LID, NumEntries, Values, Indices));
+      } else {
+        IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length, NumEntries, Values, Indices));
+      }
 
       for (int kk = 0 ; kk < NumVectors ; ++kk) {
         for (int k = 0 ; k < NumEntries ; ++k) {
@@ -1044,8 +1065,11 @@ DoSGS(const Epetra_MultiVector& X, Epetra_MultiVector& Xcopy,
       LID = (*Partitioner_)(i,j);
 
       int NumEntries;
-      IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length,NumEntries,
-                                               &Values[0], &Indices[0]));
+      if (CrsMatrix) {
+        IFPACK_CHK_ERR(CrsMatrix->ExtractMyRowView(LID, NumEntries, Values, Indices));
+      } else {
+        IFPACK_CHK_ERR(Matrix().ExtractMyRowCopy(LID, Length, NumEntries, Values, Indices));
+      }
 
       for (int kk = 0 ; kk < NumVectors ; ++kk) {
         for (int k = 0 ; k < NumEntries ; ++k) {
@@ -1096,6 +1120,11 @@ DoSGS(const Epetra_MultiVector& X, Epetra_MultiVector& Xcopy,
     for (int m = 0 ; m < NumVectors ; ++m)
       for (int i = 0 ; i < NumMyRows ; ++i)
         y_ptr[m][i] = y2_ptr[m][i];
+
+  if (!CrsMatrix) {
+    delete[] Indices;
+    delete[] Values;
+  }
 
   return(0);
 }
